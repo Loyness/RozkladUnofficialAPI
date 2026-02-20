@@ -1,12 +1,12 @@
 # UnofficialRozkladAPI
 
-## Fetching
-
-Install dependencies:
+Install dependencies before running any of the scripts:
 
 ```bash
 pip install -r requirements.txt
 ```
+
+## Fetching
 
 Run:
 
