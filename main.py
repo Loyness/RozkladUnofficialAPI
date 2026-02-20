@@ -15,8 +15,6 @@ _CACHE = {
 
 
 def load_data(url=None, refresh=False, ttl=60):
-    if url is None:
-        url = os.environ.get('ROZKLAD_URL')
     now = time.time()
     if not refresh and _CACHE['data'] is not None and _CACHE['url'] == url and (now - _CACHE['ts']) < ttl:
         return _CACHE['data']
@@ -36,7 +34,8 @@ def index():
 
 @app.route('/predms') # Предмети
 def get_predms():
-    data = load_data()
+    rozklad_url = request.args.get('rozklad_url')
+    data = load_data(url=rozklad_url)
     predms = data.get('predms') if isinstance(data, dict) else None
     if predms is None:
         return json_resp({'error': 'predms not available'}, 404)
@@ -44,7 +43,8 @@ def get_predms():
 
 @app.route('/auds') # Класи
 def get_auds():
-    data = load_data()
+    rozklad_url = request.args.get('rozklad_url')
+    data = load_data(url=rozklad_url)
     auds = data.get('auds') if isinstance(data, dict) else None
     if auds is None:
         return json_resp({'error': 'auds not available'}, 404)
@@ -52,7 +52,8 @@ def get_auds():
 
 @app.route('/days') # Дні тижня
 def get_days():
-    data = load_data()
+    rozklad_url = request.args.get('rozklad_url')
+    data = load_data(url=rozklad_url)
     days = data.get('days') if isinstance(data, dict) else None
     if days is None:
         return json_resp({'error': 'days not available'}, 404)
@@ -61,7 +62,8 @@ def get_days():
 
 @app.route('/unums_c') # Номери уроків (Для класів)
 def get_unums_c():
-    data = load_data()
+    rozklad_url = request.args.get('rozklad_url')
+    data = load_data(url=rozklad_url)
     unums = data.get('unums_c') if isinstance(data, dict) else None
     if unums is None:
         return json_resp({'error': 'unums_c not available'}, 404)
@@ -70,7 +72,8 @@ def get_unums_c():
 
 @app.route('/classes') # Класи
 def list_classes():
-    data = load_data()
+    rozklad_url = request.args.get('rozklad_url')
+    data = load_data(url=rozklad_url)
     classes = data.get('classes') if isinstance(data, dict) else None
     if not classes:
         return json_resp({'error': 'classes not available'}, 404)
@@ -85,28 +88,10 @@ def find_class(classes, identifier):
             return info
     return None
 
-@app.route('/class_schedule') # Розклад для класу
-def class_schedule():
-    cls_id = request.args.get('id')
-    cls_name = request.args.get('name')
-    refresh = request.args.get('refresh') == '1'
-    data = load_data(refresh=refresh)
-    classes = data.get('classes') if isinstance(data, dict) else None
-    if not classes:
-        return json_resp({'error': 'classes not available'}, 404)
-    target = None
-    if cls_id:
-        target = classes.get(str(cls_id)) or classes.get(int(cls_id))
-    if not target and cls_name:
-        target = find_class(classes, cls_name)
-    if not target:
-        return json_resp({'error': 'class not found; provide id or exact name (e.g. "1-А")'}, 404)
-    return json_resp({'name': target.get('name'), 'roz': target.get('roz')})
-
-
 @app.route('/teachers') # Вчителі
 def list_teachers():
-    data = load_data()
+    rozklad_url = request.args.get('rozklad_url')
+    data = load_data(url=rozklad_url)
     teachers = data.get('teachers') if isinstance(data, dict) else None
     if not teachers:
         return json_resp({'error': 'teachers not available'}, 404)
@@ -121,33 +106,68 @@ def find_teacher_by_name(teachers, name):
     return None, None
 
 
-@app.route('/teacher_schedule') # Розклад для вчителя
+@app.route('/class_schedule')  # Розклад для класу
+def class_schedule():
+    cls_id = request.args.get('id')
+    cls_name = request.args.get('name')
+    rozklad_url = request.args.get('rozklad_url')
+    refresh = request.args.get('refresh') == '1'
+    
+    data = load_data(url=rozklad_url, refresh=refresh)
+    classes = data.get('classes') if isinstance(data, dict) else None
+    if not classes:
+        return json_resp({'error': 'classes not available'}, 404)
+    
+    target = None
+    if cls_id:
+        try:
+            cls_id = int(cls_id)
+        except ValueError:
+            pass
+        target = classes.get(cls_id) or classes.get(str(cls_id))
+    if not target and cls_name:
+        target = find_class(classes, cls_name)
+    if not target:
+        return json_resp({'error': 'class not found; provide id or exact name (e.g. "1-А")'}, 404)
+    
+    return json_resp({'name': target.get('name'), 'roz': target.get('roz')})
+
+@app.route('/teacher_schedule')  # Розклад для вчителя
 def teacher_schedule():
     t_id = request.args.get('id')
     t_name = request.args.get('name')
+    rozklad_url = request.args.get('rozklad_url')
     refresh = request.args.get('refresh') == '1'
-    data = load_data(refresh=refresh)
+    
+    data = load_data(url=rozklad_url, refresh=refresh)
     teachers = data.get('teachers') if isinstance(data, dict) else None
     if not teachers:
         return json_resp({'error': 'teachers not available'}, 404)
+    
     target = None
     if t_id:
-        target = teachers.get(str(t_id)) or teachers.get(int(t_id))
+        try:
+            t_id = int(t_id)
+        except ValueError:
+            pass
+        target = teachers.get(t_id) or teachers.get(str(t_id))
     if not target and t_name:
         tid, info = find_teacher_by_name(teachers, t_name)
         if tid:
             target = info
     if not target:
         return json_resp({'error': 'teacher not found; provide id or exact name (e.g. "Іванюк А.І.")'}, 404)
+    
     return json_resp({'name': target.get('name'), 'roz': target.get('roz')})
 
-@app.route('/classes_convenient') # Розклад для класу у зручному для використання форматі
+@app.route('/classes_convenient')  # Розклад для класу у зручному для використання форматі
 def classes_converted():
     c_id = request.args.get('id')
     c_name = request.args.get('name')
+    rozklad_url = request.args.get('rozklad_url')
     query = c_id or c_name
     
-    data = load_data()
+    data = load_data(url=rozklad_url)
     classes = data.get('classes', {})
     teachers = data.get('teachers', {})
     subjects = data.get('predms', {})
