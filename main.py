@@ -141,7 +141,7 @@ def teacher_schedule():
         return json_resp({'error': 'teacher not found; provide id or exact name (e.g. "Іванюк А.І.")'}, 404)
     return json_resp({'name': target.get('name'), 'roz': target.get('roz')})
 
-@app.route('/classes_convinient') # Розклад для класу у зручному для використання форматі
+@app.route('/classes_convenient') # Розклад для класу у зручному для використання форматі
 def classes_converted():
     c_id = request.args.get('id')
     c_name = request.args.get('name')
